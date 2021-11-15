@@ -17,6 +17,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     install_requires=[
+        "pygame ~= 2.1.0"
     ],
     extras_require={
         'dev': [
