@@ -3,45 +3,92 @@ import sys
 
 import pygame
 
+from labpyrinth.maze import Maze
+
 pygame.init()
+
+SCALE = 32
 
 COLOURS = {
     'black': pygame.color.Color(0x00, 0x00, 0x00),
     'white': pygame.color.Color(0xff, 0xff, 0xff),
+    'green': pygame.color.Color(0x88, 0xff, 0x88),
 }
-FONT = pygame.font.SysFont('consolas', 16)
+FONT = pygame.font.SysFont('segoeuiemoji', 16)
+FONT_HEIGHT = FONT.get_height()
+OFFSET = 0
+
+
+def blit_text(
+        display: pygame.Surface,
+        text: str,
+        location: pygame.math.Vector2,
+        antialias: bool = True,
+        colour: pygame.color.Color = COLOURS['black'],
+        font: pygame.font.Font = FONT,
+):
+    x, y = location
+    display.blit(font.render(text, antialias, colour), (x, y + OFFSET))
+
+
+def blit_path(display, x, y):
+    display.fill(COLOURS['green'], ((x * SCALE), (y * SCALE) + OFFSET, SCALE, SCALE))
 
 
 def show_fps(
         display: pygame.Surface,
         clock: pygame.time.Clock,
-        antialias: bool = True,
-        colour: pygame.color.Color = COLOURS['black'],
-        font: pygame.font.Font = FONT,
         location: pygame.math.Vector2 = pygame.math.Vector2(0, 0),
+        **kwargs
 ):
-    img = font.render(
-        f'{clock.get_fps():0.0f} FPS    Frame = {clock.get_time()} ms    Render = {clock.get_rawtime()} ms',
-        antialias,
-        colour,
-    )
-    display.blit(img, location)
+    location.y -= OFFSET
+    display.fill(COLOURS['white'], (0, 0, display.get_width(), OFFSET))
+    info = f'{clock.get_fps():0.0f} FPS    Frame = {clock.get_time()} ms    Render = {clock.get_rawtime()} ms'
+    blit_text(display, info, location, **kwargs)
 
 
-def tick(display: pygame.Surface):
+def no_tick(*_, **__):
+    pass
+
+
+def tick(display: pygame.Surface, maze_: Maze):
+    print("tick!")
     display.fill(COLOURS['white'])
+    try:
+        next(maze_.creation)
+    except StopIteration:
+        raise
+    finally:
+        for (x, y) in maze_.solution:
+            blit_path(display, x, y)
+
+        x, y = maze_.start
+        blit_text(display, maze_.start_symbol, pygame.math.Vector2(SCALE * x, SCALE * y))
+
+        for x, column in enumerate(maze_.grid):
+            for y, chars in enumerate(column):
+                for char in chars:
+                    blit_text(display, char, pygame.math.Vector2(SCALE * x, SCALE * y))
 
 
-def main(width: int = 800, height: int = 600, debug=False):
+def main(width: int = 640, height: int = 480, debug=False):
     pygame.display.set_caption('Labpyrinth')
     display = pygame.display.set_mode((width, height))
     display.fill(COLOURS['white'])
 
     clock = pygame.time.Clock()
 
+    maze_ = Maze(width=width // SCALE, height=(height - OFFSET) // SCALE)
+
+    _tick = tick
+
     while True:
-        clock.tick(60)
-        tick(display)
+        clock.tick(100)
+        try:
+            _tick(display, maze_)
+        except StopIteration:
+            _tick = no_tick
+
         if debug:
             show_fps(display, clock)
 
@@ -50,6 +97,9 @@ def main(width: int = 800, height: int = 600, debug=False):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 return
+            if (event.type == pygame.KEYDOWN) and (event.key == pygame.K_r):
+                maze_.reset()
+                _tick = tick
 
 
 def is_debug():
@@ -63,4 +113,10 @@ def is_debug():
 
 
 if __name__ == "__main__":
-    main(debug=is_debug())
+    KWARGS = {}
+
+    if is_debug():
+        OFFSET = FONT.get_height()
+        KWARGS['debug'] = True
+
+    main(**KWARGS)
