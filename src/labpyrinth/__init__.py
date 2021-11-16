@@ -12,6 +12,7 @@ SCALE = 32
 COLOURS = {
     'black': pygame.color.Color(0x00, 0x00, 0x00),
     'white': pygame.color.Color(0xff, 0xff, 0xff),
+    'grey': pygame.color.Color(0x88, 0x88, 0x88),
     'green': pygame.color.Color(0x88, 0xff, 0x88),
 }
 FONT = pygame.font.SysFont('segoeuiemoji', 16)
@@ -27,8 +28,8 @@ def blit_text(
         colour: pygame.color.Color = COLOURS['black'],
         font: pygame.font.Font = FONT,
 ):
-    x, y = location
-    display.blit(font.render(text, antialias, colour), (x, y + OFFSET))
+    location.y += OFFSET
+    display.blit(font.render(text, antialias, colour), location)
 
 
 def blit_path(display, x, y):
@@ -42,7 +43,7 @@ def show_fps(
         **kwargs
 ):
     location.y -= OFFSET
-    display.fill(COLOURS['white'], (0, 0, display.get_width(), OFFSET))
+    display.fill(COLOURS['grey'], (0, 0, display.get_width(), OFFSET))
     info = f'{clock.get_fps():0.0f} FPS    Frame = {clock.get_time()} ms    Render = {clock.get_rawtime()} ms'
     blit_text(display, info, location, **kwargs)
 
@@ -66,19 +67,19 @@ def tick(display: pygame.Surface, maze_: Maze):
         blit_text(display, maze_.start_symbol, pygame.math.Vector2(SCALE * x, SCALE * y))
 
         for x, column in enumerate(maze_.grid):
-            for y, chars in enumerate(column):
-                for char in chars:
+            for y, square in enumerate(column):
+                for char in square.symbols:
                     blit_text(display, char, pygame.math.Vector2(SCALE * x, SCALE * y))
 
 
 def main(width: int = 640, height: int = 480, debug=False):
     pygame.display.set_caption('Labpyrinth')
-    display = pygame.display.set_mode((width, height))
+    display = pygame.display.set_mode((width, height + OFFSET))
     display.fill(COLOURS['white'])
 
     clock = pygame.time.Clock()
 
-    maze_ = Maze(width=width // SCALE, height=(height - OFFSET) // SCALE)
+    maze_ = Maze(width=width // SCALE, height=height // SCALE)
 
     _tick = tick
 
