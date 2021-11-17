@@ -63,9 +63,6 @@ def tick(display: pygame.Surface, maze_: Maze):
         for (x, y) in maze_.solution:
             blit_path(display, x, y)
 
-        x, y = maze_.start
-        blit_text(display, maze_.start_symbol, pygame.math.Vector2(SCALE * x, SCALE * y))
-
         for x, column in enumerate(maze_.grid):
             for y, square in enumerate(column):
                 for char in square.symbols:
