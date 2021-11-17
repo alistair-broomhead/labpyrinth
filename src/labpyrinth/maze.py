@@ -78,3 +78,21 @@ class Maze:
                 self.solution.pop()
 
             yield
+
+        remainder = self.solution[:-1]
+
+        while remainder:
+            here = remainder[-1]
+            possible = [
+                self[moved] for moved in here.position.neighbours()
+                if self._in_bounds(moved) and not self[moved].assigned
+            ]
+
+            if possible:
+                remainder.append(
+                    random.choice(possible).from_(here)
+                )
+            else:
+                remainder.pop()
+
+            yield
