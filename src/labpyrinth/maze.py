@@ -5,48 +5,50 @@ from labpyrinth.geometry import Coordinate, Square
 
 
 class Maze:
-    solution: 'typing.List[Square]'
     width: int
     height: int
+    solution: typing.List[Square]
+
+    _grid: typing.Dict[Coordinate, Square]
 
     def __init__(self, width: int, height: int):
         if width < 3 or height < 3:
             raise ValueError("Maze must be at least 3x3")
         self.width = width
         self.height = height
-        self.grid = [[Square(Coordinate(x, y)) for y in range(height)] for x in range(width)]
-        self.start = self.end = None
-        self.solution = []
 
-        self.creation = self._create()
+        self.all_positions = {
+            Coordinate(x, y) for x in range(width) for y in range(height)
+        }
+        self.inside = list(inside := {
+            coord for coord in self.all_positions
+            if (coord.x not in {0, width - 1}) and (coord.y not in {0, height - 1})
+        })
+        self.circumference = list(self.all_positions - inside)
+
+        self.reset()
+
+    def __iter__(self):
+        yield from self._grid.values()
 
     def __getitem__(self, position):
         x, y = position
-        return self.grid[x][y]
+        return self._grid[Coordinate(x, y)]
 
     def reset(self):
-        self.__init__(self.width, self.height)
+        self._grid = {
+            coord: Square(coord) for coord in self.all_positions
+        }
+        self.solution = []
 
     def choose_start(self):
-        rightmost = self.width - 1
-        bottommost = self.height - 1
-
-        verticals = [
-            (x, y) for x in (0, rightmost) for y in range(self.height)
-        ]
-        horizontals = [
-            (x, y) for x in range(1, rightmost) for y in (0, bottommost)
-        ]
-        choice = random.choice(verticals + horizontals)
-        start = self.start = self[choice]
-        self.solution = [start]
+        choice = random.choice(self.circumference)
+        self.solution = [start := self[choice]]
         start.is_start = True
 
     def choose_end(self):
-        x = random.randint(1, self.width - 2)
-        y = random.randint(1, self.height - 2)
-        end = self.end = self[x, y]
-        end.is_end = True
+        choice = random.choice(self.inside)
+        self[choice].is_end = True
 
     def _in_bounds(self, coord: Coordinate):
         if (0 <= coord.x < self.width) and (0 <= coord.y < self.height):
@@ -55,23 +57,24 @@ class Maze:
 
     def _next_from(self, position: Coordinate):
         for moved in position.neighbours():
-            if (moved == self.end.position) or self._in_bounds(moved):
-                yield self[moved.as_tuple]
+            if self._in_bounds(moved) and not self[moved].visited:
+                yield self[moved]
 
-    def _create(self):
-        self.choose_start()
-        yield self.grid
-        self.choose_end()
-        yield self.grid
+    def create(self):
+        yield self.choose_start()
+        yield self.choose_end()
 
-        while (here := self.solution[-1]) != self.end:
-            possible = list(self._next_from(here.position))
+        while not (here := self.solution[-1]).is_end:
+            possible = [
+                self[moved] for moved in here.position.neighbours()
+                if self._in_bounds(moved) and not self[moved].visited
+            ]
 
             if possible:
-                choice = random.choice(possible).from_(here)
-
-                self.solution.append(choice)
-
-                yield self.grid
+                self.solution.append(
+                    random.choice(possible).from_(here)
+                )
             else:
                 self.solution.pop()
+
+            yield

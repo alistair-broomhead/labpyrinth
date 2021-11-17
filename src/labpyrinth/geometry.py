@@ -2,12 +2,12 @@ import typing
 
 from pygame.math import Vector2
 
-start_symbol = '😀'
-end_symbol = '🏁'
-
 
 class Coordinate:
-    moves: 'typing.Dict[Coordinate, str]'
+    down = (0, 1)
+    up = (0, -1)
+    right = (1, 0)
+    left = (-1, 0)
 
     def __init__(self, x, y):
         self.x = x
@@ -22,14 +22,6 @@ class Coordinate:
 
     def __iter__(self):
         yield from self.as_tuple
-
-    @property
-    def as_tuple(self):
-        return self.x, self.y
-
-    @property
-    def as_vector(self):
-        return Vector2(self.x, self.y)
 
     def __add__(self, other):
         x, y = other
@@ -50,18 +42,19 @@ class Coordinate:
     def __hash__(self):
         return hash((type(self), *self))
 
+    @property
+    def as_tuple(self):
+        return self.x, self.y
+
+    @property
+    def as_vector(self):
+        return Vector2(self.x, self.y)
+
     def neighbours(self):
-        for move in self.moves.keys():
-            yield self + move
-
-
-# Now that we have a class we can store these objects on it
-Coordinate.moves = {
-    Coordinate(0, 1): '↓',
-    Coordinate(1, 0): '→',
-    Coordinate(0, -1): '↑',
-    Coordinate(-1, 0): '←',
-}
+        yield self + self.up
+        yield self + self.down
+        yield self + self.left
+        yield self + self.right
 
 
 class Square:
@@ -81,21 +74,8 @@ class Square:
         other.connected_to.append(vector)
         return self
 
-    @property
-    def symbols(self):
-        if self.is_start:
-            yield start_symbol
-        if self.is_end:
-            yield end_symbol
-
-        for x in self.connected_to:
-            yield Coordinate.moves[x]
-
-        if (not self.connected_to) and self.visited and (not self.is_end):
-            yield 'x'
-
     def __repr__(self):
-        return f'{type(self).__name__}{*self.position, *self.symbols}'
+        return f'{type(self).__name__}{self.position,}'
 
     def __hash__(self):
         return hash((type(self), *self))
@@ -106,3 +86,7 @@ class Square:
     @property
     def visited(self):
         return hasattr(self, 'connected_from') or self.is_start
+
+    @property
+    def assigned(self):
+        return self.visited or self.is_end

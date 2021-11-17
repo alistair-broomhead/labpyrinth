@@ -3,7 +3,7 @@ import sys
 
 import pygame
 
-from labpyrinth.maze import Maze
+from labpyrinth import maze, geometry
 
 pygame.init()
 
@@ -52,21 +52,44 @@ def no_tick(*_, **__):
     pass
 
 
-def tick(display: pygame.Surface, maze_: Maze):
+SYMBOLS = {
+    geometry.Coordinate.down: '↓',
+    geometry.Coordinate.right: '→',
+    geometry.Coordinate.up: '↑',
+    geometry.Coordinate.left: '←',
+}
+
+
+def square_symbols(square: 'geometry.Square'):
+    if square.is_start:
+        yield '😀'
+    if square.is_end:
+        yield '🏁'
+
+    for direction in square.connected_to:
+        yield SYMBOLS[direction.as_tuple]
+
+    if not square.connected_to:  # Could be a dead end
+        if square.visited and not square.is_end:
+            yield 'x'
+
+
+def tick(display: pygame.Surface, maze_: maze.Maze, generator):
     print("tick!")
     display.fill(COLOURS['white'])
     try:
-        next(maze_.creation)
+        next(generator)
     except StopIteration:
         raise
     finally:
         for (x, y) in maze_.solution:
             blit_path(display, x, y)
 
-        for x, column in enumerate(maze_.grid):
-            for y, square in enumerate(column):
-                for char in square.symbols:
-                    blit_text(display, char, pygame.math.Vector2(SCALE * x, SCALE * y))
+        for square in maze_:
+            position = square.position.as_vector * SCALE
+
+            for char in square_symbols(square):
+                blit_text(display, char, position)
 
 
 def main(width: int = 640, height: int = 480, debug=False):
@@ -76,14 +99,15 @@ def main(width: int = 640, height: int = 480, debug=False):
 
     clock = pygame.time.Clock()
 
-    maze_ = Maze(width=width // SCALE, height=height // SCALE)
+    maze_ = maze.Maze(width=width // SCALE, height=height // SCALE)
+    generator = maze_.create()
 
     _tick = tick
 
     while True:
         clock.tick(100)
         try:
-            _tick(display, maze_)
+            _tick(display, maze_, generator)
         except StopIteration:
             _tick = no_tick
 
@@ -97,6 +121,7 @@ def main(width: int = 640, height: int = 480, debug=False):
                 return
             if (event.type == pygame.KEYDOWN) and (event.key == pygame.K_r):
                 maze_.reset()
+                generator = maze_.create()
                 _tick = tick
 
 
