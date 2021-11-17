@@ -62,7 +62,7 @@ class Maze:
                 random.choice(possible).from_(here)
             )
         else:
-            steps.pop()
+            steps.remove(here)
 
     def create(self):
         yield self.choose_start()
@@ -79,7 +79,9 @@ class Maze:
         remainder = self.solution[:-1]
 
         while remainder:
-            here = remainder[-1]
+            # This encourages having a grater number of shorter
+            # incorrect paths
+            here = random.choice(remainder)
             self._next(remainder, here, [
                 square for square in self._neighbours(here)
                 if not square.assigned  # Don't select the end
