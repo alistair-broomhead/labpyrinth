@@ -50,49 +50,38 @@ class Maze:
         choice = random.choice(self.inside)
         self[choice].is_end = True
 
-    def _in_bounds(self, coord: Coordinate):
-        if (0 <= coord.x < self.width) and (0 <= coord.y < self.height):
-            return not self[coord.as_tuple].visited
-        return False
+    def _neighbours(self, square: Square):
+        for coord in square.position.neighbours():
+            if (0 <= coord.x < self.width) and (0 <= coord.y < self.height):
+                yield self._grid[coord]
 
-    def _next_from(self, position: Coordinate):
-        for moved in position.neighbours():
-            if self._in_bounds(moved) and not self[moved].visited:
-                yield self[moved]
+    @staticmethod
+    def _next(steps: typing.List[Square], here: Square, possible: typing.List[Square]):
+        if possible:
+            steps.append(
+                random.choice(possible).from_(here)
+            )
+        else:
+            steps.pop()
 
     def create(self):
         yield self.choose_start()
         yield self.choose_end()
 
         while not (here := self.solution[-1]).is_end:
-            possible = [
-                self[moved] for moved in here.position.neighbours()
-                if self._in_bounds(moved) and not self[moved].visited
-            ]
-
-            if possible:
-                self.solution.append(
-                    random.choice(possible).from_(here)
-                )
-            else:
-                self.solution.pop()
-
+            self._next(self.solution, here, [
+                square for square in self._neighbours(here)
+                if not square.visited  # Allow selecting the end
+            ])
             yield
 
+        # We don't want a continuation from the end
         remainder = self.solution[:-1]
 
         while remainder:
             here = remainder[-1]
-            possible = [
-                self[moved] for moved in here.position.neighbours()
-                if self._in_bounds(moved) and not self[moved].assigned
-            ]
-
-            if possible:
-                remainder.append(
-                    random.choice(possible).from_(here)
-                )
-            else:
-                remainder.pop()
-
+            self._next(remainder, here, [
+                square for square in self._neighbours(here)
+                if not square.assigned  # Don't select the end
+            ])
             yield

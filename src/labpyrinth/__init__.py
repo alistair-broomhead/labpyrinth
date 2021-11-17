@@ -75,7 +75,6 @@ def square_symbols(square: 'geometry.Square'):
 
 
 def tick(display: pygame.Surface, maze_: maze.Maze, generator):
-    print("tick!")
     display.fill(COLOURS['white'])
     try:
         next(generator)
@@ -109,6 +108,7 @@ def main(width: int = 640, height: int = 480, debug=False):
         try:
             _tick(display, maze_, generator)
         except StopIteration:
+            # Prevent redrawing when there's no changes
             _tick = no_tick
 
         if debug:
@@ -117,12 +117,14 @@ def main(width: int = 640, height: int = 480, debug=False):
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
                 return
-            if (event.type == pygame.KEYDOWN) and (event.key == pygame.K_r):
-                maze_.reset()
-                generator = maze_.create()
-                _tick = tick
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return
+                if event.key == pygame.K_r:
+                    maze_.reset()
+                    generator = maze_.create()
+                    _tick = tick
 
 
 def is_debug():
@@ -142,4 +144,7 @@ if __name__ == "__main__":
         OFFSET = FONT.get_height()
         KWARGS['debug'] = True
 
-    main(**KWARGS)
+    try:
+        main(**KWARGS)
+    finally:
+        pygame.quit()
