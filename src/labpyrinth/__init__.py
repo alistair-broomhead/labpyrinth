@@ -1,3 +1,4 @@
+import itertools
 import os
 import sys
 
@@ -10,68 +11,71 @@ pygame.init()
 SCALE = 32
 
 COLOURS = {
+    # We'll use this shade of purple as a colour key
+    # for transparency, more efficient than alpha channel
+    'transparent': pygame.color.Color(0xf0, 0x0f, 0xf0),
+
     'black': pygame.color.Color(0x00, 0x00, 0x00),
     'white': pygame.color.Color(0xff, 0xff, 0xff),
     'grey': pygame.color.Color(0x88, 0x88, 0x88),
-    'green': pygame.color.Color(0x88, 0xff, 0x88),
+    'lightgreen': pygame.color.Color(0x88, 0xff, 0x88),
+    'green': pygame.color.Color(0x00, 0xff, 0x00),
+    'red': pygame.color.Color(0xff, 0x00, 0x00),
 }
 FONT = pygame.font.SysFont('segoeuiemoji', 16)
 FONT_HEIGHT = FONT.get_height()
 OFFSET = 0
 
 
-def blit_text(
-        display: pygame.Surface,
-        text: str,
-        location: pygame.math.Vector2,
-        antialias: bool = True,
-        colour: pygame.color.Color = COLOURS['black'],
-        font: pygame.font.Font = FONT,
-):
-    location.y += OFFSET
-    display.blit(font.render(text, antialias, colour), location)
-
-
-def blit_path(display, x, y):
-    display.fill(COLOURS['green'], ((x * SCALE), (y * SCALE) + OFFSET, SCALE, SCALE))
-
-
 def show_fps(
         display: pygame.Surface,
         clock: pygame.time.Clock,
-        location: pygame.math.Vector2 = pygame.math.Vector2(0, 0),
-        **kwargs
+        location: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
 ):
-    location.y -= OFFSET
     display.fill(COLOURS['grey'], (0, 0, display.get_width(), OFFSET))
     info = f'{clock.get_fps():0.0f} FPS    Frame = {clock.get_time()} ms    Render = {clock.get_rawtime()} ms'
-    blit_text(display, info, location, **kwargs)
+    display.blit(FONT.render(info, False, COLOURS['black']), location)
 
 
 def no_tick(*_, **__):
     pass
 
 
-SYMBOLS = {
-    geometry.Coordinate.down: '↓',
-    geometry.Coordinate.right: '→',
-    geometry.Coordinate.up: '↑',
-    geometry.Coordinate.left: '←',
-}
+def create_arrow_tiles(symbols, colour: pygame.Color, transparent=COLOURS['transparent']):
+    tiles = {}
+
+    for opened in (
+            opened
+            for length in range(len(symbols))
+            for opened in itertools.combinations(symbols, length + 1)
+    ):
+        if isinstance(opened, geometry.Coordinate):
+            key = geometry.Direction.to_int(opened)
+        else:
+            key = geometry.Direction.to_int(*opened)
+
+        rect = tiles[key] = pygame.Surface((SCALE, SCALE))
+        rect.set_colorkey(transparent)
+        rect.fill(transparent)
+
+        for side in opened:
+            rect.blit(
+                FONT.render(symbols[side], False, colour),
+                (0, 0)
+            )
+
+    return tiles
 
 
-def square_symbols(square: 'geometry.Square'):
-    if square.is_start:
-        yield '😀'
-    if square.is_end:
-        yield '🏁'
-
-    for direction in square.connected_to:
-        yield SYMBOLS[direction.as_tuple]
-
-    if not square.connected_to:  # Could be a dead end
-        if square.visited and not square.is_end:
-            yield 'x'
+ARROW_TILES = create_arrow_tiles(
+    symbols={
+        geometry.Direction.down: '↓',
+        geometry.Direction.right: '→',
+        geometry.Direction.up: '↑',
+        geometry.Direction.left: '←',
+    },
+    colour=COLOURS['grey']
+)
 
 
 def tick(display: pygame.Surface, maze_: maze.Maze, generator):
@@ -82,13 +86,20 @@ def tick(display: pygame.Surface, maze_: maze.Maze, generator):
         raise
     finally:
         for (x, y) in maze_.solution:
-            blit_path(display, x, y)
+            display.fill(COLOURS['lightgreen'], ((x * SCALE), (y * SCALE) + OFFSET, SCALE, SCALE))
+
+        offset = pygame.Vector2(0, OFFSET)
 
         for square in maze_:
-            position = square.position.as_vector * SCALE
+            position = pygame.math.Vector2(*square.position) * SCALE
+            position += offset
 
-            for char in square_symbols(square):
-                blit_text(display, char, position)
+            if square.is_start:
+                display.blit(FONT.render('😀', True, COLOURS['red']), position)
+            if square.is_end:
+                display.blit(FONT.render('🏁', True, COLOURS['red']), position)
+            elif key := geometry.Direction.to_int(*square.open_sides()):
+                display.blit(ARROW_TILES[key], position)
 
 
 def main(width: int = 640, height: int = 480, debug=False):

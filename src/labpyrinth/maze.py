@@ -17,9 +17,9 @@ class Maze:
         self.width = width
         self.height = height
 
-        self.all_positions = {
+        self.all_positions = frozenset(
             Coordinate(x, y) for x in range(width) for y in range(height)
-        }
+        )
         self.inside = list(inside := {
             coord for coord in self.all_positions
             if (coord.x not in {0, width - 1}) and (coord.y not in {0, height - 1})
@@ -44,22 +44,29 @@ class Maze:
     def choose_start(self):
         choice = random.choice(self.circumference)
         self.solution = [start := self[choice]]
-        start.is_start = True
+
+        for neighbour in start.neighbour_positions():
+            if not self._in_bounds(neighbour):
+                return start.start_from(neighbour)
 
     def choose_end(self):
         choice = random.choice(self.inside)
         self[choice].is_end = True
 
+    def _in_bounds(self, coord: Coordinate) -> bool:
+        return (0 <= coord.x < self.width) and (0 <= coord.y < self.height)
+
     def _neighbours(self, square: Square):
-        for coord in square.position.neighbours():
-            if (0 <= coord.x < self.width) and (0 <= coord.y < self.height):
-                yield self._grid[coord]
+        yield from (
+            self[coord] for coord in
+            filter(self._in_bounds, square.neighbour_positions())
+        )
 
     @staticmethod
     def _next(steps: typing.List[Square], here: Square, possible: typing.List[Square]):
         if possible:
             steps.append(
-                random.choice(possible).from_(here)
+                random.choice(possible).linked_from(here)
             )
         else:
             steps.remove(here)
