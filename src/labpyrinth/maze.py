@@ -49,13 +49,26 @@ class Maze:
                 return start.start_from(neighbour)
 
     def choose_end(self):
-        end = self[random.choice([
+        goal_centre = random.choice([
             Coordinate(x, y)
             for x in range(self.width // 4, 3 * self.width // 4)
             for y in range(self.height // 4, 3 * self.width // 4)
-        ])]
-        end.is_end = True
-        return end
+        ])
+
+        goal_squares = {
+            self[coord] for coord in (
+                goal_centre + (x, y)
+                for x in range(-1, 2)
+                for y in range(-1, 2)
+            )
+        }
+
+        for square in goal_squares:
+            square.is_end = True
+            for neighbour in self._neighbours(square):
+                if neighbour in goal_squares:
+                    square.connected_to.add(square.vector_to(neighbour))
+            yield square
 
     def _in_bounds(self, coord: Coordinate) -> bool:
         return (0 <= coord.x < self.width) and (0 <= coord.y < self.height)
@@ -88,7 +101,7 @@ class Maze:
         so that they can be rendered.
         """
         yield self.choose_start(),
-        yield self.choose_end(),
+        yield self.choose_end()
 
         while not (here := self.solution[-1]).is_end:
             yield self._next(self.solution, here, [

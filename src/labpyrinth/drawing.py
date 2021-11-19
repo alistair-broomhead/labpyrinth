@@ -95,10 +95,11 @@ def draw_square(
 ):
     position = grid_to_coord(square.position)
 
-    if square.is_start or square.is_end:
-        display.blit(TILES.start, position)
-    elif debug:
-        display.blit(TILES.visited, position)
+    if debug:
+        if square.is_start or square.is_end:
+            display.blit(TILES.start, position)
+        else:
+            display.blit(TILES.visited, position)
     else:
         display.blit(TILES.blank, position)
 
