@@ -50,8 +50,13 @@ class Maze:
                 return start.start_from(neighbour)
 
     def choose_end(self):
-        choice = random.choice(self.inside)
-        self[choice].is_end = True
+        end = self[random.choice([
+            Coordinate(x, y)
+            for x in range(self.width // 4, 3 * self.width // 4)
+            for y in range(self.height // 4, 3 * self.width // 4)
+        ])]
+        end.is_end = True
+        return end
 
     def _in_bounds(self, coord: Coordinate) -> bool:
         return (0 <= coord.x < self.width) and (0 <= coord.y < self.height)
