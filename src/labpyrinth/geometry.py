@@ -108,10 +108,13 @@ class Square:
         self.connected_from = position - self.position
         return self
 
+    def vector_to(self, other: 'Square') -> Coordinate:
+        return other.position - self.position
+
     def linked_from(self, other: 'Square') -> 'Square':
-        vector = self.position - other.position
-        self.connected_from = -vector
-        other.connected_to.add(vector)
+        vector = self.vector_to(other)
+        self.connected_from = vector
+        other.connected_to.add(-vector)
         return self
 
     def __repr__(self):

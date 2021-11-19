@@ -28,10 +28,6 @@ class Maze:
         self.circumference = list(self.all_positions - inside)
         self.reset()
 
-    def __iter__(self):
-        while True:
-            yield next(self._generator)
-
     def __getitem__(self, position):
         x, y = position
         return self._grid[Coordinate(x, y)]
@@ -42,7 +38,7 @@ class Maze:
         }
         self.solution = []
 
-        self._generator = self.create()
+        return self
 
     def choose_start(self):
         choice = random.choice(self.circumference)
@@ -70,19 +66,27 @@ class Maze:
             filter(self._in_bounds, square.neighbour_positions())
         )
 
-    @staticmethod
-    def _next(steps: typing.List[Square], here: Square, possible: typing.List[Square]):
-        yield here
-
+    def _next(self, steps: typing.List[Square], here: Square, possible: typing.List[Square]):
         if possible:
             steps.append(
                 there := random.choice(possible).linked_from(here)
             )
             yield there
+            yield from (
+                neighbor for neighbor in self._neighbours(there)
+                if neighbor.assigned
+            )
         else:
             steps.remove(here)
+            yield here
 
-    def create(self):
+    def create(self) -> typing.Iterable[typing.Tuple[Square]]:
+        """
+        Generates the maze, one square at a time.
+
+        Yields a tuple of all squares that have been updated
+        so that they can be rendered.
+        """
         yield self.choose_start(),
         yield self.choose_end(),
 
@@ -105,6 +109,3 @@ class Maze:
                 square for square in self._neighbours(here)
                 if not square.assigned  # Don't select the end
             ])
-
-        while True:
-            yield ()

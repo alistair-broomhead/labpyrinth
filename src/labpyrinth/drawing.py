@@ -26,23 +26,7 @@ def blit_centre(onto: pygame.Surface, blit: pygame.Surface):
     return onto
 
 
-def arrow_tiles(symbols, colour: pygame.Color):
-    d = geometry.Direction
-    tiles = {}
-
-    for opened in d.combinations():
-        rect = tiles[d.to_int(*opened)] = transparent_tile()
-
-        for side in opened:
-            blit_centre(
-                onto=rect,
-                blit=constants.FONT.render(symbols[side], False, colour)
-            )
-
-    return tiles
-
-
-def wall_tiles(colour: pygame.Color):
+def wall_tiles(colour: pygame.Color = constants.COLOURS['black']):
     d = geometry.Direction
     tiles = {}
 
@@ -85,27 +69,22 @@ def transparent_tile():
     return rect
 
 
-VISITED = tile(constants.COLOURS['lightgreen'])
-BLANK = tile(constants.COLOURS['white'])
-START = tile(constants.COLOURS['green'])
-GOAL = blit_centre(
-    tile(constants.COLOURS['green']),
-    constants.FONT.render('🏁', True, constants.COLOURS['black'])
-)
+class _Tiles:
+    def __init__(self):
+        self.visited = tile(constants.COLOURS['lightgreen'])
+        self.blank = tile(constants.COLOURS['white'])
+        self.start = tile(constants.COLOURS['green'])
+        self.goal = blit_centre(
+            tile(constants.COLOURS['green']),
+            constants.FONT.render('🏁', True, constants.COLOURS['black'])
+        )
+        self.walls = wall_tiles()
 
-ARROW_TILES = arrow_tiles(
-    symbols={
-        geometry.Direction.down: '↓',
-        geometry.Direction.right: '→',
-        geometry.Direction.up: '↑',
-        geometry.Direction.left: '←',
-    },
-    colour=constants.COLOURS['grey']
-)
+    def __call__(self):
+        self.__init__()
 
-WALL_TILES = wall_tiles(
-    colour=constants.COLOURS['black']
-)
+
+TILES = _Tiles()
 
 
 def draw_square(
@@ -116,20 +95,17 @@ def draw_square(
 ):
     position = grid_to_coord(square.position)
 
-    if debug and square in maze_.solution:
-        display.blit(VISITED, position)
+    if square.is_start or square.is_end:
+        display.blit(TILES.start, position)
+    elif debug:
+        display.blit(TILES.visited, position)
     else:
-        display.blit(BLANK, position)
-
-    if square.is_start:
-        display.blit(START, position)
-
-    if square.is_end:
-        display.blit(GOAL, position)
+        display.blit(TILES.blank, position)
 
     if key := geometry.Direction.to_int(*square.closed_sides()):
-        display.blit(WALL_TILES[key], position)
+        display.blit(TILES.walls[key], position)
 
 
 def clear_display(display):
     display.fill(constants.COLOURS['white'])
+    return display

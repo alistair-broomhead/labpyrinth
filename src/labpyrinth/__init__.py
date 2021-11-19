@@ -8,6 +8,7 @@ import sys
 import pygame
 
 pygame.init()
+pygame.display.set_caption('Labpyrinth')
 
 # pylint: disable=wrong-import-position
 from labpyrinth import (
@@ -19,33 +20,80 @@ from labpyrinth import (
 )
 
 
-def main(width: int = 600, height: int = 600, debug=False):
-    """ Event loop """
-    pygame.display.set_caption('Labpyrinth')
-    display = pygame.display.set_mode((width, height + constants.OFFSET))
-    display.fill(constants.COLOURS['white'])
+@events.Handle(type=pygame.QUIT)
+@events.Handle(type=pygame.KEYDOWN, key=pygame.K_ESCAPE)
+@events.Handle(type=pygame.KEYDOWN, key=pygame.K_q)
+def quit_game(_):
+    """ On any of these events, quit instantly """
+    raise SystemExit
 
-    clock = pygame.time.Clock()
 
-    maze_ = maze.Maze(width=width // constants.SCALE, height=height // constants.SCALE)
+class Main:
+    columns, rows = 12, 12
 
-    @events.Handle(type=pygame.KEYDOWN, key=pygame.K_r)
-    def reset(_):
-        maze_.reset()
-        drawing.clear_display(display)
+    def __init__(self, width: int = 800, height: int = 600, debug=False):
+        self.debug = debug
+        self._reset = False
 
-    for squares in maze_:
-        clock.tick(100)
+        self.maze = maze.Maze(
+            width=self.columns,
+            height=self.rows,
+        )
 
-        if debug:
-            drawing.show_fps(display, clock)
+        available_height = height - constants.OFFSET
+        col_width = width // self.columns
+        row_height = available_height // self.rows
 
-        for square in squares:
-            drawing.draw_square(display, maze_, debug, square)
+        scale = constants.SCALE = min(col_width, row_height)
+        drawing.TILES()
+
+        height = (self.rows * scale) + constants.OFFSET
+        width = self.columns * scale
+
+        self.clock = pygame.time.Clock()
+        self.display = drawing.clear_display(
+            pygame.display.set_mode((width, height))
+        )
+
+    def reset(self, _=None):
+        self._reset = True
+
+    def _create_maze(self):
+        drawing.clear_display(self.display)
+        self.maze.reset()
+
+        for squares in self.maze.create():
+            if self._reset:
+                return
+
+            for square in squares:
+                drawing.draw_square(self.display, self.maze, self.debug, square)
+
+            self._frame()
+
+    def _idle(self):
+        while not self._reset:
+            self._frame()
+
+    def _frame(self):
+        if self.debug:
+            drawing.show_fps(self.display, self.clock)
 
         pygame.display.update()
 
         events.Handle.handle_events()
+
+        self.clock.tick(100)
+
+        return self._reset
+
+    def run(self):
+        events.Handle.assign(self.reset, type=pygame.KEYDOWN, key=pygame.K_r)
+
+        while True:
+            self._reset = False
+            self._create_maze()
+            self._idle()
 
 
 def is_debug():
@@ -71,6 +119,6 @@ if __name__ == "__main__":
         KWARGS['debug'] = True
 
     try:
-        main(**KWARGS)
+        Main(**KWARGS).run()
     finally:
         pygame.quit()
