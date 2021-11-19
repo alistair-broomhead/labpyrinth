@@ -21,7 +21,8 @@ setup(
     ],
     extras_require={
         'dev': [
-            'black'
+            'black',
+            'pylint',
         ]
     },
 )

@@ -10,6 +10,7 @@ class Maze:
     solution: typing.List[Square]
 
     _grid: typing.Dict[Coordinate, Square]
+    _generator: typing.Iterable[typing.Tuple[Square]]
 
     def __init__(self, width: int, height: int):
         if width < 3 or height < 3:
@@ -25,11 +26,11 @@ class Maze:
             if (coord.x not in {0, width - 1}) and (coord.y not in {0, height - 1})
         })
         self.circumference = list(self.all_positions - inside)
-
         self.reset()
 
     def __iter__(self):
-        yield from self._grid.values()
+        while True:
+            yield next(self._generator)
 
     def __getitem__(self, position):
         x, y = position
@@ -40,6 +41,8 @@ class Maze:
             coord: Square(coord) for coord in self.all_positions
         }
         self.solution = []
+
+        self._generator = self.create()
 
     def choose_start(self):
         choice = random.choice(self.circumference)
@@ -69,14 +72,15 @@ class Maze:
 
     @staticmethod
     def _next(steps: typing.List[Square], here: Square, possible: typing.List[Square]):
+        yield here
+
         if possible:
             steps.append(
                 there := random.choice(possible).linked_from(here)
             )
-            return here, there
+            yield there
         else:
             steps.remove(here)
-            return here,
 
     def create(self):
         yield self.choose_start(),
@@ -101,3 +105,6 @@ class Maze:
                 square for square in self._neighbours(here)
                 if not square.assigned  # Don't select the end
             ])
+
+        while True:
+            yield ()
