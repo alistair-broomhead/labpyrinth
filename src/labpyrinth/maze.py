@@ -66,31 +66,33 @@ class Maze:
     def _next(steps: typing.List[Square], here: Square, possible: typing.List[Square]):
         if possible:
             steps.append(
-                random.choice(possible).linked_from(here)
+                there := random.choice(possible).linked_from(here)
             )
+            return here, there
         else:
             steps.remove(here)
+            return here,
 
     def create(self):
-        yield self.choose_start()
-        yield self.choose_end()
+        yield self.choose_start(),
+        yield self.choose_end(),
 
         while not (here := self.solution[-1]).is_end:
-            self._next(self.solution, here, [
+            yield self._next(self.solution, here, [
                 square for square in self._neighbours(here)
                 if not square.visited  # Allow selecting the end
             ])
-            yield
 
         # We don't want a continuation from the end
         remainder = self.solution[:-1]
 
         while remainder:
-            # This encourages having a grater number of shorter
-            # incorrect paths
+            # This encourages having a grater number of, albeit
+            # shorter, incorrect paths
+            end = remainder[-1]
             here = random.choice(remainder)
-            self._next(remainder, here, [
+            here = random.choice((here, end))
+            yield self._next(remainder, here, [
                 square for square in self._neighbours(here)
                 if not square.assigned  # Don't select the end
             ])
-            yield

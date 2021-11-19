@@ -1,6 +1,6 @@
-import itertools
 import os
 import sys
+import typing
 
 import pygame
 
@@ -41,33 +41,38 @@ def no_tick(*_, **__):
     pass
 
 
-def create_arrow_tiles(symbols, colour: pygame.Color, transparent=COLOURS['transparent']):
+def transparent_tile():
+    rect = pygame.Surface((SCALE, SCALE))
+    rect.set_colorkey(COLOURS['transparent'])
+    rect.fill(COLOURS['transparent'])
+
+    return rect
+
+
+def blit_centre(onto: pygame.Surface, blit: pygame.Surface):
+    x = onto.get_width() - blit.get_width()
+    y = onto.get_height() - blit.get_height()
+    onto.blit(blit, (x / 2, y / 2))
+    return onto
+
+
+def arrow_tiles(symbols, colour: pygame.Color):
+    d = geometry.Direction
     tiles = {}
 
-    for opened in (
-            opened
-            for length in range(len(symbols))
-            for opened in itertools.combinations(symbols, length + 1)
-    ):
-        if isinstance(opened, geometry.Coordinate):
-            key = geometry.Direction.to_int(opened)
-        else:
-            key = geometry.Direction.to_int(*opened)
-
-        rect = tiles[key] = pygame.Surface((SCALE, SCALE))
-        rect.set_colorkey(transparent)
-        rect.fill(transparent)
+    for opened in d.combinations():
+        rect = tiles[d.to_int(*opened)] = transparent_tile()
 
         for side in opened:
-            rect.blit(
-                FONT.render(symbols[side], False, colour),
-                (0, 0)
+            blit_centre(
+                onto=rect,
+                blit=FONT.render(symbols[side], False, colour)
             )
 
     return tiles
 
 
-ARROW_TILES = create_arrow_tiles(
+ARROW_TILES = arrow_tiles(
     symbols={
         geometry.Direction.down: '↓',
         geometry.Direction.right: '→',
@@ -78,28 +83,80 @@ ARROW_TILES = create_arrow_tiles(
 )
 
 
-def tick(display: pygame.Surface, maze_: maze.Maze, generator):
-    display.fill(COLOURS['white'])
+def wall_tiles(colour: pygame.Color):
+    d = geometry.Direction
+    tiles = {}
+
+    wall_thickness = SCALE // 8
+    end_offset = SCALE - wall_thickness
+
+    lookup = {
+        d.up: (0, 0, SCALE, wall_thickness),
+        d.down: (0, end_offset, SCALE, wall_thickness),
+        d.left: (0, 0, wall_thickness, SCALE),
+        d.right: (end_offset, 0, wall_thickness, SCALE),
+    }
+
+    for closed in d.combinations():
+        rect = tiles[d.to_int(*closed)] = transparent_tile()
+
+        for side in closed:
+            rect.fill(colour, lookup[side])
+
+    return tiles
+
+
+WALL_TILES = wall_tiles(
+    colour=COLOURS['black']
+)
+
+
+def _grid_to_coord(position: typing.Union[tuple, pygame.math.Vector2, geometry.Coordinate]) -> pygame.math.Vector2:
+    if not isinstance(position, pygame.math.Vector2):
+        position = pygame.Vector2(*position)
+
+    return (position * SCALE) + pygame.Vector2(0, OFFSET)
+
+
+VISITED = pygame.Surface((SCALE, SCALE))
+VISITED.fill(COLOURS['lightgreen'])
+BLANK = pygame.Surface((SCALE, SCALE))
+BLANK.fill(COLOURS['white'])
+
+
+def tick(display: pygame.Surface, maze_: maze.Maze, debug: bool, generator):
+    d = geometry.Direction
+
     try:
-        next(generator)
+        squares = next(generator)
     except StopIteration:
         raise
-    finally:
-        for (x, y) in maze_.solution:
-            display.fill(COLOURS['lightgreen'], ((x * SCALE), (y * SCALE) + OFFSET, SCALE, SCALE))
 
-        offset = pygame.Vector2(0, OFFSET)
+    visited = {square.position for square in maze_.solution}
 
-        for square in maze_:
-            position = pygame.math.Vector2(*square.position) * SCALE
-            position += offset
+    for square in squares:
+        if square is None:
+            continue
 
-            if square.is_start:
-                display.blit(FONT.render('😀', True, COLOURS['red']), position)
-            if square.is_end:
-                display.blit(FONT.render('🏁', True, COLOURS['red']), position)
-            elif key := geometry.Direction.to_int(*square.open_sides()):
-                display.blit(ARROW_TILES[key], position)
+        position = _grid_to_coord(square.position)
+
+        clear = VISITED if debug and square.position in visited else BLANK
+        display.blit(clear, position)
+
+        if square.is_start:
+            display.fill(COLOURS['green'], (*position, SCALE, SCALE))
+
+        if square.is_end:
+            goal = pygame.Surface((SCALE, SCALE))
+            goal.fill(COLOURS['green'])
+
+            display.blit(
+                blit_centre(goal, FONT.render('🏁', True, COLOURS['black'])),
+                position
+            )
+
+        if key := d.to_int(*square.closed_sides()):
+            display.blit(WALL_TILES[key], position)
 
 
 def main(width: int = 640, height: int = 480, debug=False):
@@ -117,7 +174,7 @@ def main(width: int = 640, height: int = 480, debug=False):
     while True:
         clock.tick(100)
         try:
-            _tick(display, maze_, generator)
+            _tick(display, maze_, debug, generator)
         except StopIteration:
             # Prevent redrawing when there's no changes
             _tick = no_tick
@@ -135,6 +192,7 @@ def main(width: int = 640, height: int = 480, debug=False):
                 if event.key == pygame.K_r:
                     maze_.reset()
                     generator = maze_.create()
+                    display.fill(COLOURS['white'])
                     _tick = tick
 
 

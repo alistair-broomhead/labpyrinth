@@ -1,3 +1,4 @@
+import itertools
 import typing
 
 from pygame.math import Vector2
@@ -64,6 +65,19 @@ class Direction:
             cls._int_lookup.get(direction, 0) for direction in directions
         )
 
+    @classmethod
+    def combinations(cls) -> typing.Iterable[typing.Tuple['Direction']]:
+        yield ()
+
+        for direction in cls.all:
+            yield direction,
+
+        for length in range(1, len(cls.all)):
+            length += 1
+
+            for selected in itertools.permutations(cls.all, length):
+                yield selected
+
 
 class Square:
     connected_from: Coordinate
@@ -92,6 +106,7 @@ class Square:
     def start_from(self, position: Coordinate):
         self.is_start = True
         self.connected_from = position - self.position
+        return self
 
     def linked_from(self, other: 'Square') -> 'Square':
         vector = self.position - other.position
