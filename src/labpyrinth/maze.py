@@ -1,3 +1,5 @@
+""" See comment on Maze class """
+
 import random
 import typing
 
@@ -5,6 +7,11 @@ from labpyrinth.geometry import Coordinate, Square
 
 
 class Maze:
+    """
+    This is where the magic happens. Create a Maze object,
+    call Maze.create() and by the time you've iterated through
+    everything it spits out, you've got you a maze!
+    """
     width: int
     height: int
     solution: typing.List[Square]
@@ -13,8 +20,8 @@ class Maze:
     _generator: typing.Iterable[typing.Tuple[Square]]
 
     def __init__(self, width: int, height: int):
-        if width < 3 or height < 3:
-            raise ValueError("Maze must be at least 3x3")
+        if width < 9 or height < 9:
+            raise ValueError("Maze must be at least 9x9")
         self.width = width
         self.height = height
 
@@ -29,30 +36,48 @@ class Maze:
         self.reset()
 
     def __getitem__(self, position):
-        x, y = position
-        return self._grid[Coordinate(x, y)]
+        if not isinstance(position, Coordinate):
+            position = Coordinate(*position)
+        return self._grid[position]
 
     def reset(self):
+        """ Reset all mutated state so we can start over """
         self._grid = {
             coord: Square(coord) for coord in self.all_positions
         }
         self.solution = []
 
-        return self
-
-    def choose_start(self):
+    def choose_start(self) -> typing.Iterable[Square]:
+        """ Choose an edge square to start from """
         choice = random.choice(self.circumference)
         self.solution = [start := self[choice]]
+        # We must have come from outside of the maze
+        external_neighbours = filter(
+            self._out_of_bounds,
+            start.neighbour_positions()
+        )
+        # There can only be exactly one or two external
+        # neighbours (two requires that the start position
+        # is on a corner) but we'll just take the first
+        # pylint: disable=stop-iteration-return
+        neighbour = next(external_neighbours)
 
-        for neighbour in start.neighbour_positions():
-            if not self._in_bounds(neighbour):
-                return start.start_from(neighbour)
+        yield start.start_from(neighbour)
 
-    def choose_end(self):
+    def choose_end(self) -> typing.Iterable[Square]:
+        """
+        Choose where the 3x3 goal square goes
+
+        We make sure there are at least 2 tiles between the
+        goal and the outside of the maze, to improve the
+        chances of an interestingly long path for the
+        solution.
+
+        """
         goal_centre = random.choice([
             Coordinate(x, y)
-            for x in range(self.width // 4, 3 * self.width // 4)
-            for y in range(self.height // 4, 3 * self.width // 4)
+            for x in range(4, self.width - 3)
+            for y in range(4, self.width - 3)
         ])
 
         goal_squares = {
@@ -73,13 +98,34 @@ class Maze:
     def _in_bounds(self, coord: Coordinate) -> bool:
         return (0 <= coord.x < self.width) and (0 <= coord.y < self.height)
 
-    def _neighbours(self, square: Square):
+    def _out_of_bounds(self, coord: Coordinate) -> bool:
+        return not self._in_bounds(coord)
+
+    def _neighbours(self, square: Square) -> typing.Iterable[Square]:
         yield from (
             self[coord] for coord in
             filter(self._in_bounds, square.neighbour_positions())
         )
 
-    def _next(self, steps: typing.List[Square], here: Square, possible: typing.List[Square]):
+    def _next(
+            self,
+            here: Square,
+            steps: typing.List[Square],
+            possible: typing.List[Square]
+    ) -> typing.Iterable[Square]:
+        """
+        Find the next step on a path, starting from here
+
+        Steps is a list of places we've visited, while possible
+        is a list of possible next steps. If there's nowhere to
+        go then we'll need to backtrack, removing our newly
+        discovered dead-end from the list of places we might
+        wish to return to.
+
+        We always yield the squares which are affected by the
+        changes we have made to the maze state, so that we can
+        re-render them in their new state.
+        """
         if possible:
             steps.append(
                 there := random.choice(possible).linked_from(here)
@@ -93,18 +139,18 @@ class Maze:
             steps.remove(here)
             yield here
 
-    def create(self) -> typing.Iterable[typing.Tuple[Square]]:
+    def create(self) -> typing.Iterable[typing.Iterable[Square]]:
         """
         Generates the maze, one square at a time.
 
         Yields a tuple of all squares that have been updated
         so that they can be rendered.
         """
-        yield self.choose_start(),
+        yield self.choose_start()
         yield self.choose_end()
 
         while not (here := self.solution[-1]).is_end:
-            yield self._next(self.solution, here, [
+            yield self._next(here, self.solution, [
                 square for square in self._neighbours(here)
                 if not square.visited  # Allow selecting the end
             ])
@@ -118,7 +164,7 @@ class Maze:
             end = remainder[-1]
             here = random.choice(remainder)
             here = random.choice((here, end))
-            yield self._next(remainder, here, [
+            yield self._next(here, remainder, [
                 square for square in self._neighbours(here)
                 if not square.assigned  # Don't select the end
             ])
