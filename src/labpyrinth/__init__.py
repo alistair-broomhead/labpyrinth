@@ -4,6 +4,7 @@ Labpyrinth is a python application which generates mazes
 
 import os
 import sys
+from datetime import datetime
 
 import pygame
 
@@ -58,6 +59,13 @@ class Main:
     def reset(self, _=None):
         self._reset = True
 
+    def save(self, _=None):
+        stamp = f'{datetime.now():%Y_%m_%d__%H_%M_%S}'
+        pygame.image.save(
+            self.display,
+            f'maze{self.columns}x{self.rows}at{stamp}.png'
+        )
+
     def _create_maze(self):
         drawing.clear_display(self.display)
         self.maze.reset()
@@ -89,6 +97,7 @@ class Main:
 
     def run(self):
         events.Handle.assign(self.reset, type=pygame.KEYDOWN, key=pygame.K_r)
+        events.Handle.assign(self.save, type=pygame.KEYDOWN, key=pygame.K_s)
 
         while True:
             self._reset = False
